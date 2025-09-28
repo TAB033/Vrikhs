@@ -1,0 +1,846 @@
+import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:google_fonts/google_fonts.dart';
+import '../controllers/graph_controller.dart';
+import '../widgets/graph_painter.dart';
+
+class GraphBuilderScreen extends StatefulWidget {
+  const GraphBuilderScreen({super.key});
+
+  @override
+  State<GraphBuilderScreen> createState() => _GraphBuilderScreenState();
+}
+
+class _GraphBuilderScreenState extends State<GraphBuilderScreen> {
+  late GraphController _controller;
+  final TextEditingController _searchController = TextEditingController();
+  List<String> _searchResults = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = GraphController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text('V R I K S H', 
+          style: TextStyle(
+            color: Colors.white, 
+            fontWeight: FontWeight.w700, 
+            fontSize: 32, // Increased by ~40% from 22.4 (20 * 1.4)
+            letterSpacing: 4.0, // Added letter spacing between characters
+            shadows: [
+              Shadow(
+                color: Colors.black38,
+                blurRadius: 4,
+                offset: Offset(1, 1),
+              ),
+            ],
+          )),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          // Undo button
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFe3d5ca).withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.5)),
+            ),
+            child: IconButton(
+              icon: Icon(Icons.undo, 
+                color: _controller.canUndo ? Colors.white : Colors.white54),
+              onPressed: _controller.canUndo ? () {
+                setState(() {
+                  _controller.undo();
+                });
+              } : null,
+              tooltip: 'Undo',
+            ),
+          ),
+          // Redo button
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFe3d5ca).withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.5)),
+            ),
+            child: IconButton(
+              icon: Icon(Icons.redo, 
+                color: _controller.canRedo ? Colors.white : Colors.white54),
+              onPressed: _controller.canRedo ? () {
+                setState(() {
+                  _controller.redo();
+                });
+              } : null,
+              tooltip: 'Redo',
+            ),
+          ),
+          // Search button
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFe3d5ca).withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.5)),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.search, color: Colors.white),
+              onPressed: () {
+                _showSearchDialog();
+              },
+              tooltip: 'Search Nodes',
+            ),
+          ),
+          // Reset button
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFe3d5ca).withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.5)),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _controller.resetGraph();
+                });
+              },
+              tooltip: 'Reset Graph',
+            ),
+          ),
+        ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          // THIS IS THE ONLY CHANGE: Replaced LinearGradient with DecorationImage
+          image: DecorationImage(
+            image: AssetImage('assets/images/wood_texture.jpg'),
+            repeat: ImageRepeat.repeat,
+          ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWideScreen = constraints.maxWidth > 600;
+            
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              child: isWideScreen
+                  ? _buildWideLayout(context, _controller, constraints)
+                  : _buildNarrowLayout(context, _controller, constraints),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWideLayout(BuildContext context, GraphController controller, BoxConstraints constraints) {
+    return Row(
+      children: [
+        // Graph visualization area
+        Expanded(
+          flex: 3,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 100, 8, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFfefae0), // Changed from dark brown to light beige
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFe3d5ca).withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: GraphVisualizationWidget(
+                nodesByDepth: controller.getNodesByDepth(),
+                selectedNode: controller.selectedNode,
+                onNodeTap: (node) {
+                  setState(() {
+                    controller.selectNode(node);
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
+        // Control panel
+        Container(
+          width: 320,
+          margin: const EdgeInsets.fromLTRB(8, 100, 16, 16),
+          child: _buildGlassmorphicControlPanel(context, controller),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNarrowLayout(BuildContext context, GraphController controller, BoxConstraints constraints) {
+    return Column(
+      children: [
+        // Control panel at top for mobile
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(16, 100, 16, 8),
+          child: _buildGlassmorphicMobileControlPanel(context, controller),
+        ),
+        // Graph visualization area
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFfefae0), // Changed from dark brown to light beige
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFe3d5ca).withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: GraphVisualizationWidget(
+                nodesByDepth: controller.getNodesByDepth(),
+                selectedNode: controller.selectedNode,
+                onNodeTap: (node) {
+                  setState(() {
+                    controller.selectNode(node);
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGlassmorphicControlPanel(BuildContext context, GraphController controller) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFb08968), // UI Surface #1E293B for mobile control panel
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Controls',
+                    style: GoogleFonts.annieUseYourTelescope(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildEnhancedSelectedNodeInfo(context, controller),
+                  const SizedBox(height: 24),
+                  _buildEnhancedActionButtons(context, controller),
+                  const SizedBox(height: 8), // Reduced bottom padding
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassmorphicMobileControlPanel(BuildContext context, GraphController controller) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFb08968), // UI Surface #1E293B for mobile control panel
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFe3d5ca).withOpacity(0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _buildEnhancedSelectedNodeInfo(context, controller)),
+                    const SizedBox(width: 16),
+                    _buildEnhancedMobileActionButtons(context, controller),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildEnhancedMobileLegend(context),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedSelectedNodeInfo(BuildContext context, GraphController controller) {
+    final selectedNode = controller.selectedNode;
+    final textStyle = GoogleFonts.annieUseYourTelescope(
+      color: Colors.white,
+      fontSize: 16,
+    );
+    final boldTextStyle = GoogleFonts.annieUseYourTelescope(
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+    );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFd1be9c), // Light beige color
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.info_outline,
+                color: const Color(0xFF7f4f24),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Selected Node',
+                style: GoogleFonts.annieUseYourTelescope(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF7f4f24),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (selectedNode != null) ...[
+            _buildInfoRow('Label', selectedNode.label, Icons.label),
+            _buildInfoRow('Depth', selectedNode.getDepth().toString(), Icons.layers),
+            _buildInfoRow('Children', selectedNode.children.length.toString(), Icons.account_tree),
+            _buildInfoRow('Type', selectedNode.isRoot ? 'Root' : selectedNode.isLeaf ? 'Leaf' : 'Branch', Icons.category),
+          ] else
+            Row(
+              children: [
+                Icon(Icons.touch_app, color: const Color(0xFF7f4f24).withOpacity(0.8), size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Tap a node to select',
+                  style: TextStyle(color: const Color(0xFF7f4f24).withOpacity(0.9)),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF7f4f24).withOpacity(0.9), size: 16),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              color: const Color(0xFF7f4f24).withOpacity(0.9),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(color: Color(0xFF7f4f24)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Common button style for action buttons
+  Widget _buildActionButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    bool isEnabled = true,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isEnabled
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFe3d5ca).withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: isEnabled ? const Color(0xFFe3d5ca) : Colors.grey[400],
+        borderRadius: BorderRadius.circular(12),
+        elevation: 0, // Remove elevation
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: const Color(0xFF7f4f24), size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: GoogleFonts.annieUseYourTelescope(
+                    color: const Color(0xFF7f4f24),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildEnhancedActionButtons(BuildContext context, GraphController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildActionButton(
+          label: 'Add Child Node',
+          icon: Icons.add_circle,
+          onPressed: controller.selectedNode != null && controller.selectedNode!.getDepth() < 99
+              ? () {
+                  setState(() {
+                    controller.addChildNode();
+                  });
+                }
+              : null,
+          isEnabled: controller.selectedNode != null && controller.selectedNode!.getDepth() < 99,
+        ),
+        const SizedBox(height: 12),
+        _buildActionButton(
+          label: 'Delete Node',
+          icon: Icons.delete,
+          onPressed: controller.selectedNode != null && !controller.selectedNode!.isRoot
+              ? () {
+                  final nodeToDelete = controller.selectedNode!;
+                  setState(() {
+                    controller.deleteNode(nodeToDelete);
+                  });
+                }
+              : null,
+          isEnabled: controller.selectedNode != null && !controller.selectedNode!.isRoot,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEnhancedMobileActionButtons(BuildContext context, GraphController controller) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF936639),
+            borderRadius: BorderRadius.circular(16),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF936639).withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: IconButton(
+            onPressed: controller.selectedNode != null && controller.selectedNode!.getDepth() < 99
+                ? () {
+                    setState(() {
+                      controller.addChildNode();
+                    });
+                  }
+                : null,
+            icon: const Icon(Icons.add_circle, color: Colors.white),
+            tooltip: 'Add Child',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF936639),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF936639).withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: IconButton(
+            onPressed: controller.selectedNode != null && !controller.selectedNode!.isRoot
+                ? () {
+                    final nodeToDelete = controller.selectedNode!;
+                    setState(() {
+                      controller.deleteNode(nodeToDelete);
+                    });
+                  }
+                : null,
+            icon: const Icon(Icons.delete, color: Colors.white),
+            tooltip: 'Delete Node',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactEnhancedLegend(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF70e000).withOpacity(0.3), // Light blue accent
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFfefae0).withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.legend_toggle,
+                color: const Color(0xFFfefae0), // Changed from dark brown to light beige
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Legend',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFfefae0), // Changed from dark brown to light beige
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildCompactLegendItem(const Color(0xFFe3d5ca), 'Root', Icons.home),
+          const SizedBox(height: 4),
+          _buildCompactLegendItem(const Color(0xFFe3d5ca), 'Branch', Icons.account_tree),
+          const SizedBox(height: 4),
+          _buildCompactLegendItem(const Color(0xFFe3d5ca), 'Leaf', Icons.circle),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.touch_app, color: Colors.white.withOpacity(0.6), size: 14),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Tap nodes to select',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactLegendItem(Color color, String label, IconData icon) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [color, color.withOpacity(0.7)],
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 10),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.white.withOpacity(0.9),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildEnhancedMobileLegend(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF70e000).withOpacity(0.3), // Light blue accent
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFfefae0).withOpacity(0.2)),
+      ),
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 8,
+        children: [
+          _buildEnhancedLegendItem(const Color(0xFFe3d5ca), 'Root', Icons.home),
+          _buildEnhancedLegendItem(const Color(0xFFe3d5ca), 'Branch', Icons.account_tree),
+          _buildEnhancedLegendItem(const Color(0xFFe3d5ca), 'Leaf', Icons.circle),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedLegendItem(Color color, String label, IconData icon) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [color, color.withOpacity(0.7)],
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 12),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white.withOpacity(0.9),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  // Search functionality
+  void _showSearchDialog() {
+    final TextEditingController nodeIdController = TextEditingController();
+    bool showError = false;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: Colors.white.withOpacity(0.95),
+              title: const Row(
+                children: [
+                  Icon(Icons.search, color: Colors.blue),
+                  SizedBox(width: 8),
+                  Text('Find Node by ID'),
+                ],
+              ),
+              content: SizedBox(
+                width: 300,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nodeIdController,
+                      autofocus: true,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Enter node ID (e.g., 1, 2, 3...)',
+                        prefixIcon: const Icon(Icons.numbers),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        errorText: null,
+                        errorStyle: const TextStyle(height: 0, fontSize: 0),
+                      ),
+                      onChanged: (value) {
+                        if (showError) {
+                          setState(() => showError = false);
+                        }
+                      },
+                      onSubmitted: (value) {
+                        _findAndSelectNode(nodeIdController.text, context, (success) {
+                          if (!success) {
+                            setState(() => showError = true);
+                          }
+                        });
+                      },
+                    ),
+                    if (showError)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Node ${nodeIdController.text} not found',
+                              style: const TextStyle(color: Colors.red, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    _findAndSelectNode(nodeIdController.text, context, (success) {
+                      if (!success) {
+                        setState(() => showError = true);
+                      }
+                    });
+                  },
+                  child: const Text('Go to Node'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  void _findAndSelectNode(String nodeId, BuildContext context, [Function(bool)? onComplete]) {
+    if (nodeId.isEmpty) {
+      if (onComplete != null) {
+        onComplete(false);
+      } else {
+        _showMessage('Please enter a node ID');
+      }
+      return;
+    }
+    
+    final node = _controller.rootNode.findNodeById(nodeId);
+    if (node != null) {
+      setState(() {
+        _controller.selectNode(node);
+      });
+      if (onComplete != null) {
+        onComplete(true);
+      }
+      Navigator.of(context).pop();
+    } else {
+      if (onComplete != null) {
+        onComplete(false);
+      } else {
+        _showMessage('Node $nodeId not found');
+      }
+    }
+  }
+
+  // Show message to user
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.blue.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+}
