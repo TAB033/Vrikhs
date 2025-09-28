@@ -34,7 +34,7 @@ A Flutter application for building and visualizing graphs with an interactive in
 1.  **Clone the repository**
     ```bash
     https://github.com/TAB033/Vriksh.git
-    cd graph_builder
+    cd Vriksh-main
     ```
 
 2.  **Install dependencies**
