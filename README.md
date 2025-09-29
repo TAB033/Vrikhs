@@ -17,7 +17,7 @@ A Flutter application for building and visualizing graphs with an interactive in
 
 ## 🖼️ Demo Video
 
-[![Watch the demo](https://img.youtube.com/vi/YNnkGa2W5ZU/hqdefault.jpg)](https://youtu.be/YNnkGa2W5ZU)
+[![Watch the demo](assets/images/Demo.gif)](https://youtu.be/YNnkGa2W5ZU)
 
 ***
 
